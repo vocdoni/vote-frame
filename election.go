@@ -50,6 +50,18 @@ func (v *vocdoniHandler) createElection(msg *apirest.APIdata, ctx *httprouter.HT
 		return fmt.Errorf("failed to unmarshal election request: %w", err)
 	}
 
+	// For debug purposes, log the user creating the election
+	fid, err := v.db.UserFromAuthToken(msg.AuthToken)
+	if err != nil {
+		log.Errorf("failed to get user from auth token %s: %v", msg.AuthToken, err)
+	} else {
+		user, err := v.db.User(fid)
+		if err != nil {
+			return fmt.Errorf("failed to get user from database: %w", err)
+		}
+		log.Infow("user creating election", "username", user.Username, "fid", fid)
+	}
+
 	// use the request census or use the one hardcoded for all farcaster users
 	census := req.Census
 	if census == nil {
@@ -64,7 +76,8 @@ func (v *vocdoniHandler) createElection(msg *apirest.APIdata, ctx *httprouter.HT
 			return fmt.Errorf("election duration too long")
 		}
 	}
-
+	req.ElectionDescription.UsersCount = uint32(len(census.Usernames))
+	req.ElectionDescription.UsersCountInitial = uint32(census.FromTotalAddresses)
 	electionID, err := v.createAndSaveElectionAndProfile(&req.ElectionDescription, census,
 		req.Profile, false, req.NotifyUsers, ElectionSourceWebApp)
 	if err != nil {
@@ -311,7 +324,7 @@ func (v *vocdoniHandler) createAndSaveElectionAndProfile(desc *ElectionDescripti
 		if err != nil {
 			return fmt.Errorf("failed to create election: %w", err)
 		}
-		if err := v.saveElectionAndProfile(election, profile, source); err != nil {
+		if err := v.saveElectionAndProfile(election, profile, source, desc.UsersCount, desc.UsersCountInitial); err != nil {
 			return fmt.Errorf("failed to save election and profile: %w", err)
 		}
 		if notify {
@@ -341,10 +354,15 @@ func (v *vocdoniHandler) createAndSaveElectionAndProfile(desc *ElectionDescripti
 }
 
 // saveElectionAndProfile saves the election and the profile in the database.
-func (v *vocdoniHandler) saveElectionAndProfile(election *api.Election, profile *FarcasterProfile, source string) error {
+func (v *vocdoniHandler) saveElectionAndProfile(
+	election *api.Election,
+	profile *FarcasterProfile,
+	source string,
+	usersCount, usersCountInitial uint32,
+) error {
 	// add the election to the LRU cache and the database
 	v.electionLRU.Add(election.ElectionID.String(), election)
-	if err := v.db.AddElection(election.ElectionID, profile.FID, source); err != nil {
+	if err := v.db.AddElection(election.ElectionID, profile.FID, source, usersCount, usersCountInitial); err != nil {
 		return fmt.Errorf("failed to add election to database: %w", err)
 	}
 	u, err := v.db.User(profile.FID)

@@ -17,23 +17,38 @@ type Users struct {
 
 // User represents a farcaster user.
 type User struct {
-	UserID         uint64   `json:"userID,omitempty" bson:"_id"`
-	ElectionCount  uint64   `json:"electionCount" bson:"electionCount"`
-	CastedVotes    uint64   `json:"castedVotes" bson:"castedVotes"`
-	Username       string   `json:"username" bson:"username"`
-	CustodyAddress string   `json:"custodyAddress" bson:"custodyAddress"`
-	Addresses      []string `json:"addresses" bson:"addresses"`
-	Signers        []string `json:"signers" bson:"signers"`
+	UserID         uint64    `json:"userID,omitempty" bson:"_id"`
+	ElectionCount  uint64    `json:"electionCount" bson:"electionCount"`
+	CastedVotes    uint64    `json:"castedVotes" bson:"castedVotes"`
+	Username       string    `json:"username" bson:"username"`
+	CustodyAddress string    `json:"custodyAddress" bson:"custodyAddress"`
+	Addresses      []string  `json:"addresses" bson:"addresses"`
+	Signers        []string  `json:"signers" bson:"signers"`
+	Followers      uint64    `json:"followers" bson:"followers"`
+	LastUpdated    time.Time `json:"lastUpdated" bson:"lastUpdated"`
+}
+
+// UserAccessProfile holds the user's access profile data, used by our backend to determine the user's access level.
+// It also holds the notification status.
+type UserAccessProfile struct {
+	UserID                 uint64 `json:"userID,omitempty" bson:"_id"`
+	NotificationsAccepted  bool   `json:"notificationsAccepted" bson:"notificationsAccepted"`
+	NotificationsRequested bool   `json:"notificationsRequested" bson:"notificationsRequested"`
+	Reputation             uint32 `json:"reputation" bson:"reputation"`
+	AccessLevel            uint32 `json:"accessLevel" bson:"accessLevel"`
+	WhiteListed            bool   `json:"whiteListed" bson:"whiteListed"`
 }
 
 // Election represents an election and its details owned by a user.
 type Election struct {
-	ElectionID   string    `json:"electionId" bson:"_id"`
-	UserID       uint64    `json:"userId" bson:"userId"`
-	CastedVotes  uint64    `json:"castedVotes" bson:"castedVotes"`
-	LastVoteTime time.Time `json:"lastVoteTime" bson:"lastVoteTime"`
-	CreatedTime  time.Time `json:"createdTime" bson:"createdTime"`
-	Source       string    `json:"source" bson:"source"`
+	ElectionID            string    `json:"electionId" bson:"_id"`
+	UserID                uint64    `json:"userId" bson:"userId"`
+	CastedVotes           uint64    `json:"castedVotes" bson:"castedVotes"`
+	LastVoteTime          time.Time `json:"lastVoteTime" bson:"lastVoteTime"`
+	CreatedTime           time.Time `json:"createdTime" bson:"createdTime"`
+	Source                string    `json:"source" bson:"source"`
+	FarcasterUserCount    uint32    `json:"farcasterUserCount" bson:"farcasterUserCount"`
+	InitialAddressesCount uint32    `json:"initialAddressesCount" bson:"initialAddressesCount"`
 }
 
 // Results represents the final results of an election.
@@ -46,6 +61,13 @@ type Results struct {
 type VotersOfElection struct {
 	ElectionID string   `json:"electionId" bson:"_id"`
 	Voters     []uint64 `json:"voters" bson:"voters"`
+}
+
+// Authentication represents the authentication data for a user.
+type Authentication struct {
+	UserID     uint64    `json:"userId" bson:"_id"`
+	AuthTokens []string  `json:"authTokens" bson:"authTokens"`
+	UpdatedAt  time.Time `json:"updatedAt" bson:"updatedAt"`
 }
 
 // NotificationType represents the type of notification to be sent to a user.

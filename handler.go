@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +40,7 @@ type vocdoniHandler struct {
 	airstack      *airstack.Airstack
 
 	censusCreationMap sync.Map
+	addAuthTokenFunc  func(uint64, string)
 }
 
 func NewVocdoniHandler(
@@ -102,6 +104,11 @@ func NewVocdoniHandler(
 	return vh, ensureAccountExist(cli)
 }
 
+// AddAuthTokenFunc sets the function to add an authentication token to the farcaster API.
+func (v *vocdoniHandler) AddAuthTokenFunc(f func(uint64, string)) {
+	v.addAuthTokenFunc = f
+}
+
 func (v *vocdoniHandler) landing(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(ctx.URLParam("electionID"))
 	if err != nil {
@@ -155,6 +162,19 @@ func (v *vocdoniHandler) info(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 		return fmt.Errorf("failed to fetch election: %w", err)
 	}
 
+	// try to get the census size from the database (number of actual farcaster users)
+	// as failing to get it, we will use the max census size
+	censusUserCount := election.Census.MaxCensusSize
+	electionInDB, err := v.db.Election(electionIDbytes)
+	if err != nil {
+		log.Debugw("election not found in db", "electionID", electionID)
+	} else {
+		censusUserCount = uint64(electionInDB.FarcasterUserCount)
+		if censusUserCount == 0 {
+			censusUserCount = election.Census.MaxCensusSize
+		}
+	}
+
 	text := []string{}
 	text = append(text, fmt.Sprintf("\nStarted at %s UTC", election.StartDate.Format("2006-01-02 15:04:05")))
 	if !election.FinalResults {
@@ -165,10 +185,10 @@ func (v *vocdoniHandler) info(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 	text = append(text, fmt.Sprintf("Poll id %x...", election.ElectionID[:16]))
 	text = append(text, fmt.Sprintf("Executed on network %s", v.cli.ChainID()))
 	text = append(text, fmt.Sprintf("Census hash %x...", election.Census.CensusRoot[:12]))
-	if election.Census.MaxCensusSize >= uint64(maxElectionSize) {
-		text = append(text, fmt.Sprintf("Allowed voters %d", election.Census.MaxCensusSize))
+	if censusUserCount >= uint64(maxElectionSize) {
+		text = append(text, fmt.Sprintf("Allowed voters %d", censusUserCount))
 	} else {
-		text = append(text, fmt.Sprintf("Census size %d", election.Census.MaxCensusSize))
+		text = append(text, fmt.Sprintf("Census size %d", censusUserCount))
 	}
 
 	png, err := imageframe.InfoImage(text)
@@ -209,5 +229,17 @@ func (v *vocdoniHandler) importDB(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 			log.Errorf("failed to import database: %v", err)
 		}
 	}()
+	return ctx.Send(nil, http.StatusOK)
+}
+
+// whitelistHandler is a handler to whitelist a user.
+func (v *vocdoniHandler) whitelistHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	fid, err := strconv.ParseUint(ctx.URLParam("fid"), 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse fid: %w", err)
+	}
+	if err := v.db.SetWhiteListedForUser(fid, true); err != nil {
+		return fmt.Errorf("failed to get whitelist: %w", err)
+	}
 	return ctx.Send(nil, http.StatusOK)
 }
