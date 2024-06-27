@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path"
@@ -17,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	c3client "github.com/vocdoni/census3/apiclient"
 	c3web3 "github.com/vocdoni/census3/helpers/web3"
 	"github.com/vocdoni/vote-frame/airstack"
 	"github.com/vocdoni/vote-frame/communityhub"
@@ -27,6 +29,7 @@ import (
 	"github.com/vocdoni/vote-frame/features"
 	"github.com/vocdoni/vote-frame/mongo"
 	"github.com/vocdoni/vote-frame/notifications"
+	"github.com/vocdoni/vote-frame/reputation"
 	urlapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -65,6 +68,8 @@ func main() {
 		"https://rpc.degen.tips,https://eth.llamarpc.com,https://rpc.ankr.com/eth,https://ethereum-rpc.publicnode.com,https://mainnet.optimism.io,https://optimism.llamarpc.com,https://optimism-mainnet.public.blastapi.io,https://rpc.ankr.com/optimism",
 		"Web3 RPCs")
 	flag.Bool("indexer", false, "Enable the indexer to autodiscover users and their profiles")
+	// census3 flags
+	flag.String("census3APIEndpoint", "https://census3-dev.vocdoni.net/api", "The Census3 API endpoint to use")
 	// community hub flags
 	flag.String("communityHubAddress", "", "The address of the CommunityHub contract")
 	flag.Uint64("communityHubChainID", 666666666, "The chain ID of the CommunityHub contract (default: DegenChain 666666666)")
@@ -92,6 +97,8 @@ func main() {
 	// Limited features flags
 	flag.Int32("featureNotificationReputation", 15, "Reputation threshold to enable the notification feature")
 	flag.Int32("maxDirectMessages", 10000, "The maximum number of direct messages that any user can send. It will be scaled based on the reputation of the user.")
+	flag.Duration("reputationUpdateInterval", time.Hour*6, "The interval to update the reputation of the users")
+	flag.Int("concurrentReputationUpdates", 5, "The number of concurrent reputation updates")
 
 	// Parse the command line flags
 	flag.Parse()
@@ -128,6 +135,8 @@ func main() {
 	web3endpoint := strings.Split(web3endpointStr, ",")
 	neynarAPIKey := viper.GetString("neynarAPIKey")
 	indexer := viper.GetBool("indexer")
+	// census3 vars
+	census3APIEndpoint := viper.GetString("census3APIEndpoint")
 	// community hub vars
 	communityHubAddress := viper.GetString("communityHubAddress")
 	communityHubChainID := viper.GetUint64("communityHubChainID")
@@ -151,6 +160,8 @@ func main() {
 	// limited features vars
 	featureNotificationReputation := uint32(viper.GetInt32("featureNotificationReputation"))
 	maxDirectMessages = uint32(viper.GetInt32("maxDirectMessages"))
+	reputationUpdateInterval := viper.GetDuration("reputationUpdateInterval")
+	concurrentReputationUpdates := viper.GetInt("concurrentReputationUpdates")
 
 	// overwrite features thesholds
 	if featureNotificationReputation > 0 {
@@ -186,6 +197,7 @@ func main() {
 		"mongoDB", mongoDB,
 		"pollSize", pollSize,
 		"pprofPort", pprofPort,
+		"census3APIEndpoint", census3APIEndpoint,
 		"communityHubAddress", communityHubAddress,
 		"communityHubChainID", communityHubChainID,
 		"communityHubAdmin", communityHubAdminPrivKey != "",
@@ -272,6 +284,16 @@ func main() {
 	}
 	log.Infow("web3 pool initialized", "endpoints", web3pool.String())
 
+	// create census3 client
+	c3url, err := url.Parse(census3APIEndpoint)
+	if err != nil {
+		log.Fatal(err)
+	}
+	census3Client, err := c3client.NewHTTPclient(c3url, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Create the Farcaster API client
 	neynarcli, err := neynar.NewNeynarAPI(neynarAPIKey, web3pool)
 	if err != nil {
@@ -318,6 +340,13 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+
+	// start reputation updater
+	repUpdater, err := reputation.NewUpdater(mainCtx, db, neynarcli, as, census3Client, concurrentReputationUpdates)
+	if err != nil {
+		log.Fatal(err)
+	}
+	repUpdater.Start(reputationUpdateInterval)
 
 	// Create the Vocdoni handler
 	apiTokenUUID := uuid.MustParse(apiToken)

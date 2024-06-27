@@ -11,11 +11,11 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.8.4
-	github.com/vocdoni/census3 v0.1.4-0.20240418065546-c3ac49eec357
+	github.com/vocdoni/census3 v0.1.4-0.20240627101210-fed1055a1f30
 	github.com/zeebo/blake3 v0.2.3
 	go.mongodb.org/mongo-driver v1.14.0
-	go.vocdoni.io/dvote v1.10.2-0.20240604174445-1c49e3077576
-	go.vocdoni.io/proto v1.15.6-0.20240209115732-27836380ccae
+	go.vocdoni.io/dvote v1.10.2-0.20240617105531-77480ae05205
+	go.vocdoni.io/proto v1.15.8
 	google.golang.org/protobuf v1.34.0
 )
 
