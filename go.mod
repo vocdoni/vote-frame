@@ -11,18 +11,18 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.8.4
-	github.com/vocdoni/census3 v0.1.4-0.20240418065546-c3ac49eec357
+	github.com/vocdoni/census3 v0.1.4-0.20240627101210-fed1055a1f30
 	github.com/zeebo/blake3 v0.2.3
 	go.mongodb.org/mongo-driver v1.14.0
-	go.vocdoni.io/dvote v1.10.2-0.20240604174445-1c49e3077576
-	go.vocdoni.io/proto v1.15.6-0.20240209115732-27836380ccae
+	go.vocdoni.io/dvote v1.10.2-0.20240617105531-77480ae05205
+	go.vocdoni.io/proto v1.15.8
 	google.golang.org/protobuf v1.34.0
-	lukechampine.com/blake3 v1.3.0
 )
 
 require (
 	bazil.org/fuse v0.0.0-20200407214033-5883e5a4b512 // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2 // indirect
+	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210406120253-ab86bc2846d9 // indirect
 	github.com/766b/chi-prometheus v0.0.0-20211217152057-87afa9aa2ca8 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
@@ -340,5 +340,6 @@ require (
 	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	lukechampine.com/blake3 v1.3.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
