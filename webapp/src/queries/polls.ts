@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { ethers } from 'ethers'
+import { useReadContract } from 'wagmi'
 import { useAuth } from '~components/Auth/useAuth'
 import { useDegenHealthcheck } from '~components/Healthcheck/use-healthcheck'
-import { appUrl, degenChainRpc, degenContractAddress } from '~constants'
-import { CommunityHub__factory } from '~typechain'
-import { toArrayBuffer } from '~util/hex'
+import { appUrl } from '~constants'
+import { communityHubAbi } from '~src/bindings'
+import { getChain, getContractForChain } from '~util/chain'
+import { config } from '~util/rainbow'
 
 export const fetchPollInfo = (bfetch: FetchFunction, electionID: string) => async (): Promise<PollResponse> => {
   const response = await bfetch(`${appUrl}/poll/info/${electionID}`)
@@ -71,22 +72,20 @@ export const useApiPollInfo = (electionId?: string) => {
   })
 }
 
-export const useContractPollInfo = (communityId?: string, electionId?: string) => {
+export const useContractPollInfo = (chainAlias?: string, communityId?: string, electionId?: string) => {
   const { connected } = useDegenHealthcheck()
-  return useQuery({
-    queryKey: ['contractPollInfo', communityId, electionId],
-    queryFn: async () => {
-      const provider = new ethers.JsonRpcProvider(degenChainRpc, undefined, { polling: false, staticNetwork: true })
-      try {
-        const contract = CommunityHub__factory.connect(degenContractAddress, provider)
-        const contractData = await contract.getResult(communityId!, toArrayBuffer(electionId!))
-        return contractData
-      } catch (e) {
-        provider.destroy()
-        throw e
-      }
+  return useReadContract({
+    abi: communityHubAbi,
+    config: {
+      ...config,
+      chains: [getChain(chainAlias)],
     },
-    retry: connected,
-    enabled: !!communityId && !!electionId,
+    address: getContractForChain(chainAlias),
+    functionName: 'getResult',
+    args: [BigInt(communityId!), `0x${electionId}`],
+    query: {
+      retry: connected,
+      enabled: !!chainAlias && !!communityId && !!electionId,
+    },
   })
 }
